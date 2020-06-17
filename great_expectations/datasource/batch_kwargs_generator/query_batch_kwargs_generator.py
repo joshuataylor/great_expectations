@@ -26,10 +26,21 @@ class QueryBatchKwargsGenerator(BatchKwargsGenerator):
 
     Queries can be parameterized using $substitution.
 
-    query_generator:
+    Example configuration:
+
+      queries:
         class_name: QueryBatchKwargsGenerator
-        queries:
-           movies_by_date: SELECT * FROM movies where $start <= date AND date <= $end
+        query_store_backend:
+          class_name: TupleFilesystemStoreBackend
+          filepath_suffix: .sql
+          base_directory: queries
+
+    Example query template:
+
+    SELECT * FROM movies where '$start'::date <= release_date AND release_date <= '$end'::date;
+
+
+    Example usage:
 
     context.build_batch_kwargs(
         "my_db",
