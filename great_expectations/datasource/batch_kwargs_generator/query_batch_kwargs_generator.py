@@ -22,7 +22,23 @@ except ImportError:
 
 
 class QueryBatchKwargsGenerator(BatchKwargsGenerator):
-    """Produce query-style batch_kwargs from sql files stored on disk
+    """Produce query-style batch_kwargs from sql files or defined queries.
+
+    Queries can be parameterized using $substitution.
+
+    query_generator:
+        class_name: QueryBatchKwargsGenerator
+        queries:
+           movies_by_date: SELECT * FROM movies where $start <= date AND date <= $end
+
+    context.build_batch_kwargs(
+        "my_db",
+        "query_generator",
+        "movies_by_date",
+        "query_parameters": {
+            "start": "2020-01-01",
+            "end": "2020-02-01"
+        }
     """
 
     recognized_batch_parameters = {
@@ -37,15 +53,19 @@ class QueryBatchKwargsGenerator(BatchKwargsGenerator):
         super(QueryBatchKwargsGenerator, self).__init__(
             name=name, datasource=datasource
         )
-        root_directory = None
+        if (
+            datasource
+            and datasource.data_context
+            and datasource.data_context.root_directory
+        ):
+            root_directory = datasource.data_context.root_directory
+        else:
+            root_directory = None
+
         if query_store_backend is None:
             # We will choose a Tuple store if there is a configured DataContext with a root_directory,
             # and an InMemoryStore otherwise
-            if (
-                datasource
-                and datasource.data_context
-                and datasource.data_context.root_directory
-            ):
+            if root_directory:
                 query_store_backend = {
                     "class_name": "TupleFilesystemStoreBackend",
                     "base_directory": os.path.join(
@@ -57,7 +77,6 @@ class QueryBatchKwargsGenerator(BatchKwargsGenerator):
                     ),
                     "filepath_suffix": ".sql",
                 }
-                root_directory = datasource.data_context.root_directory
             else:
                 query_store_backend = {"class_name": "InMemoryStoreBackend"}
         module_name = "great_expectations.data_context.store"
