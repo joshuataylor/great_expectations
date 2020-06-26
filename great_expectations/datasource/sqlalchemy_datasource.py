@@ -134,6 +134,33 @@ class SqlAlchemyDatasource(Datasource):
                 self.drivername = urlparse(url).scheme
                 self.engine = create_engine(url, **kwargs)
                 self.engine.connect()
+            elif "key_pair_password" in credentials:
+                drivername = credentials.pop("drivername")
+                if drivername != "snowflake":
+                    logger.warning("The keypair authentication has only been tested with Snowflake")
+
+                from cryptography.hazmat.backends import default_backend
+                from cryptography.hazmat.primitives import serialization
+
+                key_pair_path = credentials.pop("key_pair_path")
+                key_pair_password = credentials.pop("key_pair_password")
+
+                with open(key_pair_path, "rb") as key:
+                    p_key = serialization.load_pem_private_key(
+                        key.read(),
+                        password=key_pair_password.encode(),
+                        backend=default_backend()
+                    )
+
+                pkb = p_key.private_bytes(
+                    encoding=serialization.Encoding.DER,
+                    format=serialization.PrivateFormat.PKCS8,
+                    encryption_algorithm=serialization.NoEncryption())
+                import snowflake
+                options = snowflake.sqlalchemy.URL(**credentials)
+
+                self.engine = create_engine(options, connect_args={'private_key': pkb})
+                self.engine.connect()
 
             # Otherwise, connect using remaining kwargs
             else:
